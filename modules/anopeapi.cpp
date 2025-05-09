@@ -3,6 +3,7 @@
 #include "module.h"
 #include "modules/httplib.h"
 #include "modules/ssl.h"
+#include "config.h"
 
 #include <algorithm>
 #include <iostream>
@@ -22,9 +23,9 @@ class AccessTokens
 public:
   AccessTokens()
   {
-    issuer = Config->GetModule("anopeapi")->Get<std::string>("issuer", "AnopeAPI");
-    secret = Config->GetModule("anopeapi")->Get<std::string>("secret", "oh-no");
-    token_life = Config->GetModule("anopeapi")->Get<int>("token_life", "36000");
+    issuer = Config->GetModule("anopeapi").Get<std::string>("issuer", "AnopeAPI");
+    secret = Config->GetModule("anopeapi").Get<std::string>("secret", "oh-no");
+    token_life = Config->GetModule("anopeapi").Get<int>("token_life", "36000");
   }
 
   std::string GrantUserToken(const std::string& nickname)
@@ -153,7 +154,7 @@ class APIIdentifyRequest final : public IdentifyRequest
 
 public:
   APIIdentifyRequest(Module* o, const json& req, httplib::Response& resp, const std::string& acc, const std::string& pass)
-  : IdentifyRequest(o, acc, pass), request_data(req), response(&resp), acc(acc)
+  : IdentifyRequest(o, acc, pass, ""), request_data(req), response(&resp), acc(acc)
   {
   }
 
@@ -206,19 +207,19 @@ public:
     api_server->stop();
   }
 
-  void OnReload(Configuration::Conf* conf) override
+  void OnReload(Configuration::Conf &conf) override
   {
     Log(LOG_NORMAL, "module") << "AnopeAPI: OnReload...";
 
-    Configuration::Block *block = Config->GetModule(this);
+    const auto block = conf.GetModule(this);
 
     // read info we need with defaults
-    bind_ip = block->Get<std::string>("bind_ip", "");
-    port = block->Get<int>("port", "8118");
-    base_uri = block->Get<std::string>("base_uri", "");
-    enable_ssl = block->Get<bool>("enable_ssl", true);
-    cert = block->Get<std::string>("cert", "");
-    pkey = block->Get<std::string>("pkey", "");
+    bind_ip = block.Get<std::string>("bind_ip", "0.0.0.0");
+    port = block.Get<int>("port", "8118");
+    base_uri = block.Get<std::string>("base_uri", "/api");
+    enable_ssl = block.Get<bool>("enable_ssl", false);
+    cert = block.Get<std::string>("cert", "");
+    pkey = block.Get<std::string>("pkey", "");
     
     if (bind_ip.empty())
       throw ConfigException(this->name + "bind_ip cannot be empty.");
@@ -353,11 +354,13 @@ public:
     }));
 
     try {
+      Log(LOG_NORMAL, "module") << "Trying to load AnopeAPI server on " + bind_ip + " port: " + std::to_string(port) + " ...";
+
       if (!api_server->listen(bind_ip, port)) {
         throw std::runtime_error("Failed to bind " + bind_ip + " to port " + std::to_string(port) + ". Another process might be using it.");
       }
 
-      Log(LOG_NORMAL, "module") << "Anope API server listening on " << bind_ip << ":" << port;
+      Log(LOG_NORMAL, "module") << "Anope API server listening on " << bind_ip << ":" << std::to_string(port);
 
     } catch (const std::exception &e) {
       Log(LOG_NORMAL, "module") << "Error starting server: " << e.what();
