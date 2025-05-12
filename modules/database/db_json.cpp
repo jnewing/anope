@@ -61,7 +61,7 @@ public:
 				continue;
 
 			Anope::string akey(yyjson_mut_get_str(key));
-			if (akey.equals_ci("id"))
+			if (akey.equals_ci("@id"))
 			{
 				this->id = yyjson_mut_get_uint(value);
 				continue;
@@ -201,6 +201,22 @@ private:
 		CreateBackup(backupdir, dbpath, monthly_backups, "%Y-%m", "\?\?\?\?-\?\?");
 	}
 
+	void LoadType(Serialize::Type *s_type, yyjson_mut_val *data)
+	{
+		auto *entries = yyjson_mut_obj_get(data, s_type->GetName().c_str());
+		if (!entries || !yyjson_mut_is_arr(entries))
+			return;
+
+		Log(LOG_DEBUG) << "Loading " << yyjson_mut_arr_size(entries) << " " << s_type->GetName() << " records";
+		size_t idx, max;
+		yyjson_mut_val *elem;
+		yyjson_mut_arr_foreach(entries, idx, max, elem)
+		{
+			Data ld(elem);
+			s_type->Unserialize(nullptr, ld);
+		}
+	}
+
 	DBPair ReadDatabase(const Anope::string &dbname)
 	{
 		yyjson_read_err errmsg;
@@ -246,7 +262,7 @@ private:
 
 	static void UpdateMetadata(yyjson_mut_doc *doc, yyjson_mut_val *obj)
 	{
-		const auto generator = "Anope " + Anope::Version();
+		const auto generator = "Anope " + Anope::Version() + " " + Anope::VersionBuildString();
 		yyjson_mut_obj_upsert(doc, obj, "generator", yyjson_mut_strncpy(doc, generator.c_str(), generator.length()));
 		yyjson_mut_obj_upsert(doc, obj, "version", yyjson_mut_uint(doc, ANOPE_DATABASE_VERSION));
 		yyjson_mut_obj_upsert(doc, obj, "updated", yyjson_mut_int(doc, Anope::CurTime));
@@ -269,19 +285,11 @@ public:
 		for (const auto &type : Serialize::Type::GetTypeOrder())
 		{
 			auto *s_type = Serialize::Type::Find(type);
-			if (!s_type || !s_type->GetOwner())
-				continue;
-
-			size_t idx, max;
-			yyjson_mut_val *elem;
-			yyjson_mut_arr_foreach(data, idx, max, elem)
-			{
-				Data ld(elem);
-				s_type->Unserialize(nullptr, ld);
-			}
+			if (s_type && !s_type->GetOwner())
+				LoadType(s_type, data);
 		}
 
-		loaded = false;
+		loaded = true;
 		return EVENT_STOP;
 	}
 
@@ -346,7 +354,7 @@ public:
 
 			auto *elem = yyjson_mut_arr_add_obj(doc, type);
 			if (item->id)
-				yyjson_mut_obj_add_uint(doc, elem, "id", item->id);
+				yyjson_mut_obj_add_uint(doc, elem, "@id", item->id);
 
 			Data sd;
 			s_type->Serialize(item, sd);
@@ -413,15 +421,8 @@ public:
 			it = databases.emplace(s_type->GetOwner(), db).first;
 		}
 
-		auto &[doc, data] = it->second;
-
-		size_t idx, max;
-		yyjson_mut_val *elem;
-		yyjson_mut_arr_foreach(data, idx, max, elem)
-		{
-			Data ld(elem);
-			s_type->Unserialize(nullptr, ld);
-		}
+		auto &[_, data] = it->second;
+		LoadType(s_type, data);
 	}
 };
 

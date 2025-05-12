@@ -19,7 +19,8 @@ struct Stats final
 
 	Stats() : Serializable("Stats")
 	{
-		me = this;
+		if (!me)
+			me = this;
 	}
 };
 
@@ -41,32 +42,11 @@ struct StatsType final
 	{
 		data["maxusercnt"] >> MaxUserCount;
 		data["maxusertime"] >> MaxUserTime;
-		return obj;
+		return Stats::me;
 	}
 };
 
-Stats *Stats::me;
-
-/**
- * Count servers connected to server s
- * @param s The server to start counting from
- * @return Amount of servers connected to server s
- **/
-static int stats_count_servers(Server *s)
-{
-	if (!s)
-		return 0;
-
-	int count = 1;
-
-	if (!s->GetLinks().empty())
-	{
-		for (auto *link : s->GetLinks())
-			count += stats_count_servers(link);
-	}
-
-	return count;
-}
+Stats *Stats::me = nullptr;
 
 class CommandOSStats final
 	: public Command
@@ -150,8 +130,8 @@ private:
 	static void DoStatsUptime(CommandSource &source)
 	{
 		time_t uptime = Anope::CurTime - Anope::StartTime;
-		source.Reply(_("Current users: \002%zu\002 (\002%d\002 ops)"), UserListByNick.size(), OperCount);
-		source.Reply(_("Maximum users: \002%d\002 (%s)"), MaxUserCount, Anope::strftime(MaxUserTime, source.GetAccount()).c_str());
+		source.Reply(_("Current users: \002%zu\002 (\002%zu\002 ops)"), UserListByNick.size(), OperCount);
+		source.Reply(_("Maximum users: \002%zu\002 (%s)"), MaxUserCount, Anope::strftime(MaxUserTime, source.GetAccount()).c_str());
 		source.Reply(_("Services up %s."), Anope::Duration(uptime, source.GetAccount()).c_str());
 
 		return;
@@ -167,7 +147,7 @@ private:
 
 		source.Reply(_("Uplink server: %s"), Me->GetLinks().front()->GetName().c_str());
 		source.Reply(_("Uplink capab: %s"), buf.c_str());
-		source.Reply(_("Servers found: %d"), stats_count_servers(Me->GetLinks().front()));
+		source.Reply(_("Servers found: %zu"), Servers::ByName.size() - 1);
 		return;
 	}
 
@@ -340,7 +320,7 @@ public:
 	void OnUserConnect(User *u, bool &exempt) override
 	{
 		if (UserListByNick.size() == MaxUserCount && Anope::CurTime == MaxUserTime)
-			stats_saver.QueueUpdate();
+			Stats::me->QueueUpdate();
 	}
 };
 

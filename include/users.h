@@ -23,8 +23,8 @@ typedef Anope::unordered_map<User *> user_map;
 
 extern CoreExport user_map UserListByNick, UserListByUID;
 
-extern CoreExport int OperCount;
-extern CoreExport unsigned MaxUserCount;
+extern CoreExport size_t OperCount;
+extern CoreExport size_t MaxUserCount;
 extern CoreExport time_t MaxUserTime;
 
 /* Online user and channel data. */
@@ -105,7 +105,7 @@ protected:
 	 * @param svhost The vhost of the user
 	 * @param sip The ip of the user
 	 * @param sserver The server of the user
-	 * @param srealname The realname/gecos of the user
+	 * @param srealname The realname of the user
 	 * @param ts User's timestamp
 	 * @param smodes User's modes
 	 * @param suid The unique identifier of the user.
