@@ -37,7 +37,7 @@ public:
 		: public Serialize::Type
 	{
 		Type();
-		void Serialize(const Serializable *obj, Serialize::Data &data) const override;
+		void Serialize(Serializable *obj, Serialize::Data &data) const override;
 		Serializable *Unserialize(Serializable *obj, Serialize::Data &data) const override;
 	};
 
@@ -113,7 +113,7 @@ public:
 	 * @return the nick, if found
 	 */
 	static NickAlias *Find(const Anope::string &nick);
-	static NickAlias *FindId(uint64_t id);
+	static NickAlias *FindId(uint64_t uid);
 };
 
 /* A registered account. Each account must have a NickAlias with the same nick as the
@@ -129,7 +129,7 @@ public:
 		: public Serialize::Type
 	{
 		Type();
-		void Serialize(const Serializable *obj, Serialize::Data &data) const override;
+		void Serialize(Serializable *obj, Serialize::Data &data) const override;
 		Serializable *Unserialize(Serializable *obj, Serialize::Data &data) const override;
 	};
 
@@ -137,7 +137,7 @@ private:
 	/* Channels which reference this core in some way (this is on their access list, akick list, is founder, successor, etc) */
 	Serialize::Checker<std::map<ChannelInfo *, int> > chanaccess;
 	/* Unique identifier for the account. */
-	uint64_t id;
+	uint64_t uniqueid;
 public:
 	/* Name of the account. Find(display)->nc == this. */
 	Anope::string display;
@@ -195,7 +195,7 @@ public:
 	 * @return The account, if it exists
 	 */
 	static NickCore *Find(const Anope::string &nick);
-	static NickCore *FindId(uint64_t id);
+	static NickCore *FindId(uint64_t uid);
 
 	void AddChannelReference(ChannelInfo *ci);
 	void RemoveChannelReference(ChannelInfo *ci);

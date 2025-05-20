@@ -139,9 +139,9 @@ NickAlias *NickAlias::Find(const Anope::string &nick)
 	return NULL;
 }
 
-NickAlias *NickAlias::FindId(uint64_t id)
+NickAlias *NickAlias::FindId(uint64_t uid)
 {
-	const auto *nc = NickCore::FindId(id);
+	const auto *nc = NickCore::FindId(uid);
 	return nc ? nc->na : nullptr;
 }
 
@@ -150,7 +150,7 @@ NickAlias::Type::Type()
 {
 }
 
-void NickAlias::Type::Serialize(const Serializable *obj, Serialize::Data &data) const
+void NickAlias::Type::Serialize(Serializable *obj, Serialize::Data &data) const
 {
 	const auto *na = static_cast<const NickAlias *>(obj);
 	data.Store("nick", na->nick);
@@ -158,7 +158,7 @@ void NickAlias::Type::Serialize(const Serializable *obj, Serialize::Data &data) 
 	data.Store("last_realname", na->last_realname);
 	data.Store("last_usermask", na->last_usermask);
 	data.Store("last_realhost", na->last_realhost);
-	data.Store("time_registered", na->registered);
+	data.Store("registered", na->registered);
 	data.Store("last_seen", na->last_seen);
 	data.Store("ncid", na->nc->GetId());
 
@@ -211,7 +211,7 @@ Serializable *NickAlias::Type::Unserialize(Serializable *obj, Serialize::Data &d
 	data["last_realname"] >> na->last_realname;
 	data["last_usermask"] >> na->last_usermask;
 	data["last_realhost"] >> na->last_realhost;
-	data["time_registered"] >> na->registered;
+	data["registered"] >> na->registered;
 	data["last_seen"] >> na->last_seen;
 
 	Anope::string vhost_ident, vhost_host, vhost_creator;
@@ -235,6 +235,8 @@ Serializable *NickAlias::Type::Unserialize(Serializable *obj, Serialize::Data &d
 	// End 1.9 compatibility.
 
 	// Begin 2.0 compatibility.
+	if (!na->registered)
+		data["time_registered"] >> na->registered;
 	if (na->registered < na->nc->registered)
 		na->nc->registered = na->registered;
 	// End 2.0 compatibility.

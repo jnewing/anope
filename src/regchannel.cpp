@@ -44,7 +44,7 @@ AutoKick::Type::Type()
 {
 }
 
-void AutoKick::Type::Serialize(const Serializable *obj, Serialize::Data &data) const
+void AutoKick::Type::Serialize(Serializable *obj, Serialize::Data &data) const
 {
 	const auto *ak = static_cast<const AutoKick *>(obj);
 	data.Store("ci", ak->ci->name);
@@ -78,7 +78,7 @@ Serializable *AutoKick::Type::Unserialize(Serializable *obj, Serialize::Data &da
 		ak = anope_dynamic_static_cast<AutoKick *>(obj);
 		data["creator"] >> ak->creator;
 		data["reason"] >> ak->reason;
-		ak->nc = NickCore::Find(snc);
+		ak->nc = nc;
 		data["mask"] >> ak->mask;
 		data["addtime"] >> ak->addtime;
 		data["last_used"] >> ak->last_used;
@@ -186,7 +186,7 @@ ChannelInfo::Type::Type()
 {
 }
 
-void ChannelInfo::Type::Serialize(const Serializable *obj, Serialize::Data &data) const
+void ChannelInfo::Type::Serialize(Serializable *obj, Serialize::Data &data) const
 {
 	const auto *ci = static_cast<const ChannelInfo *>(obj);
 
@@ -196,7 +196,7 @@ void ChannelInfo::Type::Serialize(const Serializable *obj, Serialize::Data &data
 	if (ci->successor)
 		data.Store("successorid", ci->successor->GetId());
 	data.Store("description", ci->desc);
-	data.Store("time_registered", ci->registered);
+	data.Store("registered", ci->registered);
 	data.Store("last_used", ci->last_used);
 	data.Store("last_topic", ci->last_topic);
 	data.Store("last_topic_setter", ci->last_topic_setter);
@@ -244,7 +244,7 @@ Serializable *ChannelInfo::Type::Unserialize(Serializable *obj, Serialize::Data 
 	ci->SetSuccessor(ssuccessorid ? NickCore::FindId(ssuccessorid) : NickCore::Find(ssuccessor));
 
 	data["description"] >> ci->desc;
-	data["time_registered"] >> ci->registered;
+	data["registered"] >> ci->registered;
 	data["last_used"] >> ci->last_used;
 	data["last_topic"] >> ci->last_topic;
 	data["last_topic_setter"] >> ci->last_topic_setter;
@@ -327,6 +327,11 @@ Serializable *ChannelInfo::Type::Unserialize(Serializable *obj, Serialize::Data 
 	if (b)
 		ci->Extend<bool>("SIGNKICK_LEVEL");
 	// End 1.9 compatibility.
+
+	// Begin 2.0 compatibility.
+	if (!ci->registered)
+		data["time_registered"] >> ci->registered;
+	// End 2.0 compatibility.
 
 	return ci;
 }

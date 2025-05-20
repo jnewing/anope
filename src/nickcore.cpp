@@ -21,7 +21,7 @@ Serialize::Checker<nickcoreid_map> NickCoreIdList(NICKCORE_TYPE);
 NickCore::NickCore(const Anope::string &coredisplay, uint64_t coreid)
 	: Serializable(NICKCORE_TYPE)
 	, chanaccess(CHANNELINFO_TYPE)
-	, id(coreid)
+	, uniqueid(coreid)
 	, display(coredisplay)
 	, aliases(NICKALIAS_TYPE)
 {
@@ -32,8 +32,8 @@ NickCore::NickCore(const Anope::string &coredisplay, uint64_t coreid)
 		Log(LOG_DEBUG) << "Duplicate account " << this->display << " in NickCore table";
 
 	// Upgrading users may not have an account identifier.
-	if (this->id && !NickCoreIdList->insert_or_assign(this->id, this).second)
-		Log(LOG_DEBUG) << "Duplicate account id " << this->id << " in NickCore table";
+	if (this->uniqueid && !NickCoreIdList->insert_or_assign(this->uniqueid, this).second)
+		Log(LOG_DEBUG) << "Duplicate account id " << this->uniqueid << " in NickCore table";
 
 	FOREACH_MOD(OnNickCoreCreate, (this));
 }
@@ -55,8 +55,8 @@ NickCore::~NickCore()
 	this->users.clear();
 
 	NickCoreList->erase(this->display);
-	if (this->id)
-		NickCoreIdList->erase(this->id);
+	if (this->uniqueid)
+		NickCoreIdList->erase(this->uniqueid);
 
 	if (!this->memos.memos->empty())
 	{
@@ -71,16 +71,16 @@ NickCore::Type::Type()
 {
 }
 
-void NickCore::Type::Serialize(const Serializable *obj, Serialize::Data &data) const
+void NickCore::Type::Serialize(Serializable *obj, Serialize::Data &data) const
 {
-	const auto *nc = static_cast<const NickCore *>(obj);
+	auto *nc = static_cast<NickCore *>(obj);
 	data.Store("display", nc->display);
-	data.Store("uniqueid", nc->id);
+	data.Store("uniqueid", nc->GetId());
 	data.Store("pass", nc->pass);
 	data.Store("email", nc->email);
 	data.Store("language", nc->language);
 	data.Store("lastmail", nc->lastmail);
-	data.Store("time_registered", nc->registered);
+	data.Store("registered", nc->registered);
 	data.Store("memomax", nc->memos.memomax);
 
 	std::ostringstream oss;
@@ -110,7 +110,7 @@ Serializable *NickCore::Type::Unserialize(Serializable *obj, Serialize::Data &da
 	data["email"] >> nc->email;
 	data["language"] >> nc->language;
 	data["lastmail"] >> nc->lastmail;
-	data["time_registered"] >> nc->registered;
+	data["registered"] >> nc->registered;
 	data["memomax"] >> nc->memos.memomax;
 	{
 		Anope::string buf;
@@ -180,6 +180,11 @@ Serializable *NickCore::Type::Unserialize(Serializable *obj, Serialize::Data &da
 	}
 	// End 2.0 compatibility.
 
+	// Begin 2.1 compatibility.
+	if (!nc->registered)
+		data["time_registered"] >> nc->registered;
+	// End 2.1 compatibility.
+
 	return nc;
 }
 
@@ -239,9 +244,9 @@ NickCore *NickCore::Find(const Anope::string &nick)
 	return NULL;
 }
 
-NickCore *NickCore::FindId(uint64_t id)
+NickCore *NickCore::FindId(uint64_t uid)
 {
-	auto it = NickCoreIdList->find(id);
+	auto it = NickCoreIdList->find(uid);
 	if (it != NickCoreIdList->end())
 	{
 		it->second->QueueUpdate();
@@ -252,25 +257,25 @@ NickCore *NickCore::FindId(uint64_t id)
 
 uint64_t NickCore::GetId()
 {
-	if (this->id)
-		return this->id;
+	if (this->uniqueid)
+		return this->uniqueid;
 
 	// We base the account identifier on the account display at registration and
 	// when the account was first registered. This should be unique enough that
 	// it never collides. In the extremely rare case that it does generate a
 	// duplicate id we try with a new suffix.
 	uint64_t attempt = 0;
-	while (!this->id)
+	while (!this->uniqueid)
 	{
 		const auto newidstr = this->display + "\0" + Anope::ToString(this->registered) + "\0" + Anope::ToString(attempt++);
 		const auto newid = Anope::hash_cs()(newidstr);
 		if (NickCoreIdList->emplace(newid, this).second)
 		{
-			this->id = newid;
+			this->uniqueid = newid;
 			this->QueueUpdate();
 			break;
 		}
 	}
 
-	return this->id;
+	return this->uniqueid;
 }
