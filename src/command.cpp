@@ -215,7 +215,7 @@ void Command::OnSyntaxError(CommandSource &source, const Anope::string &subcomma
 		// The help command may not be called HELP.
 		return cmd.second.name == "generic/help";
 	});
-	if (it == source.service->commands.end())
+	if (it != source.service->commands.end())
 		source.Reply(MORE_INFO, source.service->GetQueryCommand("generic/help", source.command).c_str());
 }
 
@@ -229,12 +229,16 @@ namespace
 		auto umessage = message.upper();
 		for (const auto &[command, info] : source.service->commands)
 		{
-			if (info.hide || command == message)
-				continue; // Don't suggest a hidden alias or a missing command.
+			if (info.hide)
+				continue; // Don't suggest a hidden alias.
 
 			size_t dist = Anope::Distance(umessage, command);
 			if (dist < distance)
 			{
+				ServiceReference<Command> cmd("Command", info.name);
+				if (!cmd)
+					continue; // Don't suggest an unloaded command.
+
 				distance = dist;
 				similar = command;
 			}
@@ -243,12 +247,12 @@ namespace
 		bool has_help = source.service->commands.find("HELP") != source.service->commands.end();
 		if (has_help && similar.empty())
 		{
-			source.Reply(_("Unknown command \002%s\002. \"%s\" for help."), message.c_str(),
+			source.Reply(_("Unknown command \002%s\002. Type \002%s\002 for help."), message.c_str(),
 				source.service->GetQueryCommand("generic/help").c_str());
 		}
 		else if (has_help)
 		{
-			source.Reply(_("Unknown command \002%s\002. Did you mean \002%s\002? \"%s\" for help."),
+			source.Reply(_("Unknown command \002%s\002. Did you mean \002%s\002? Type \002%s\002 for help."),
 				message.c_str(), similar.c_str(), source.service->GetQueryCommand("generic/help").c_str());
 		}
 		else if (similar.empty())

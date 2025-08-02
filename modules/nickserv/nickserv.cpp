@@ -11,6 +11,11 @@
 
 #include "module.h"
 
+namespace
+{
+	Anope::string enforcer_user, enforcer_host, enforcer_real;
+}
+
 class NickServCollide;
 static std::set<NickServCollide *> collides;
 
@@ -98,7 +103,7 @@ class NickServRelease final
 
 public:
 	NickServRelease(Module *me, NickAlias *na, time_t delay)
-		: User(na->nick, Config->GetModule(me).Get<const Anope::string>("enforceruser", "user"), Config->GetModule(me).Get<const Anope::string>("enforcerhost", Me->GetName()), "", "", Me, "Services Enforcer", Anope::CurTime, "", {}, IRCD->UID_Retrieve(), NULL)
+		: User(na->nick, enforcer_user, enforcer_host, "", "", Me, enforcer_real, Anope::CurTime, "", {}, IRCD->UID_Retrieve(), nullptr)
 		, Timer(me, delay)
 		, nick(na->nick)
 	{
@@ -219,16 +224,21 @@ public:
 			auto protect = protectafter ? *protectafter : block.Get<time_t>("defaultprotect", "1m");
 			protect = std::clamp(protect, block.Get<time_t>("minprotect", "10s"), block.Get<time_t>("maxprotect", "10m"));
 
+			u->SendMessage(NickServ, _(
+					"This nickname is registered and has protection enabled. If it belongs to you, "
+					"type \002%s\032\037password\037\002 to identify to your account."
+				),
+				NickServ->GetQueryCommand("nickserv/identify", u->nick).c_str()
+			);
+
 			if (protect)
 			{
-				u->SendMessage(NickServ, NICK_IS_SECURE, NickServ->GetQueryCommand("nickserv/identify").c_str());
-				u->SendMessage(NickServ, _("If you do not change within %s, I will change your nick."),
+				u->SendMessage(NickServ, _("Your nickname will be changed in %s if you do not identify."),
 					Anope::Duration(protect, u->Account()).c_str());
 				new NickServCollide(this, this, u, na, protect);
 			}
 			else
 			{
-				u->SendMessage(NickServ, FORCENICKCHANGE_NOW);
 				this->Collide(u, na);
 			}
 		}
@@ -317,7 +327,8 @@ public:
 
 	void OnReload(Configuration::Conf &conf) override
 	{
-		const Anope::string &nsnick = conf.GetModule(this).Get<const Anope::string>("client");
+		const auto &modconf = conf.GetModule(this);
+		const Anope::string &nsnick = modconf.Get<const Anope::string>("client");
 
 		if (nsnick.empty())
 			throw ConfigException(Module::name + ": <client> must be defined");
@@ -328,7 +339,7 @@ public:
 
 		NickServ = bi;
 
-		spacesepstream(conf.GetModule(this).Get<const Anope::string>("defaults", "memo_signon memo_receive")).GetTokens(defaults);
+		spacesepstream(modconf.Get<const Anope::string>("defaults", "memo_signon memo_receive")).GetTokens(defaults);
 		if (defaults.empty())
 		{
 			defaults.emplace_back("MEMO_SIGNON");
@@ -336,6 +347,10 @@ public:
 		}
 		else if (defaults[0].equals_ci("none"))
 			defaults.clear();
+
+		enforcer_user = modconf.Get<const Anope::string>("enforceruser", "enforcer");
+		enforcer_host = modconf.Get<const Anope::string>("enforcerhost", Me->GetName());
+		enforcer_real = modconf.Get<const Anope::string>("enforcerreal", "Services Enforcer");
 	}
 
 	void OnDelNick(NickAlias *na) override
@@ -351,7 +366,7 @@ public:
 
 	void OnDelCore(NickCore *nc) override
 	{
-		Log(NickServ, "nick") << "Deleting nickname group " << nc->display;
+		Log(NickServ, "nick") << "Deleting account " << nc->display;
 
 		/* Clean up this nick core from any users online */
 		for (std::list<User *>::iterator it = nc->users.begin(); it != nc->users.end();)
@@ -367,7 +382,7 @@ public:
 
 	void OnChangeCoreDisplay(NickCore *nc, const Anope::string &newdisplay) override
 	{
-		Log(LOG_NORMAL, "nick", NickServ) << "Changing " << nc->display << " nickname group display to " << newdisplay;
+		Log(LOG_NORMAL, "nick", NickServ) << "Changing " << nc->display << " account display nickname to " << newdisplay;
 	}
 
 	void OnNickIdentify(User *u) override
@@ -391,10 +406,9 @@ public:
 		if (block.Get<bool>("forceemail", "yes") && u->Account()->email.empty())
 		{
 			u->SendMessage(NickServ, _(
-					"You must now supply an email for your nick. "
-					"This email will allow you to retrieve your password in "
-					"case you forget it. "
-					"Type \002%s\032\037email\037\002 in order to set your email."
+					"You must now supply an email address for your nick. This email address will "
+					"allow you to recover your account in case you forget your password. Type "
+					"\002%s\032\037email\037\002 in order to set your email address."
 				),
 				NickServ->GetQueryCommand("nickserv/set/email").c_str());
 		}
@@ -482,7 +496,7 @@ public:
 			IRCD->SendLogin(u, na);
 			if (!Config->GetModule("nickserv").Get<bool>("nonicknameownership") && na->nc == u->Account() && !na->nc->HasExt("UNCONFIRMED"))
 				u->SetMode(NickServ, "REGISTERED");
-			Log(u, "", NickServ) << u->GetMask() << " automatically identified for group " << u->Account()->display;
+			Log(u, "", NickServ) << u->GetMask() << " automatically identified for account " << u->Account()->display;
 		}
 
 		if (!u->nick.equals_ci(oldnick) && old_na)
@@ -607,7 +621,7 @@ public:
 
 			if (expire)
 			{
-				Log(LOG_NORMAL, "nickserv/expire", NickServ) << "Expiring nickname " << na->nick << " (group: " << na->nc->display << ") (email: " << (na->nc->email.empty() ? "none" : na->nc->email) << ")";
+				Log(LOG_NORMAL, "nickserv/expire", NickServ) << "Expiring nickname " << na->nick << " (account: " << na->nc->display << ") (email: " << (na->nc->email.empty() ? "none" : na->nc->email) << ")";
 				FOREACH_MOD(OnNickExpire, (na));
 				delete na;
 			}

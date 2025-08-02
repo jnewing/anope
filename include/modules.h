@@ -158,7 +158,9 @@ enum
 	PSEUDOCLIENT = 1 << 5,
 	/* Module provides IRCd protocol support */
 	PROTOCOL = 1 << 6,
-	MT_END = 1 << 7
+	/* Module is deprecated */
+	DEPRECATED = 1 << 7,
+	MT_END = DEPRECATED,
 };
 typedef unsigned short ModType;
 
@@ -1046,9 +1048,10 @@ public:
 
 	/** Called to determine if a channel mode can be set by a user
 	 * @param u The user
+	 * @param c The channel
 	 * @param cm The mode
 	 */
-	virtual EventReturn OnCanSet(User *u, const ChannelMode *cm) ATTR_NOT_NULL(2, 3) { throw NotImplementedException(); }
+	virtual EventReturn OnCanSet(User *u, Channel *c, const ChannelMode *cm) ATTR_NOT_NULL(2, 3) { throw NotImplementedException(); }
 
 	virtual EventReturn OnCheckDelete(Channel *c)  ATTR_NOT_NULL(2) { throw NotImplementedException(); }
 
@@ -1245,9 +1248,10 @@ public:
 
 	/** Find the first module of a certain type
 	 * @param type The module type
+	 * @param ignore If non-nullptr then a module to ignore.
 	 * @return The module
 	 */
-	static Module *FindFirstOf(ModType type);
+	static Module *FindFirstOf(ModType type, Module *ignore = nullptr);
 
 	/** Checks whether this version of Anope is at least major.minor.patch.build
 	 * Throws a ModuleException if not

@@ -17,11 +17,37 @@
 # pragma GCC diagnostic ignored "-Wformat-security"
 #endif
 
-/* List of messages for each news type.  This simplifies message sending. */
+namespace
+{
+	Anope::string TypeToString(NewsType nt)
+	{
+		switch (nt)
+		{
+			case NEWS_LOGON:
+				return "LOGON";
+			case NEWS_RANDOM:
+				return "RANDOM";
+			case NEWS_OPER:
+				return "OPER";
+		}
+		return ""; // Should never happen.
+	}
+
+	NewsType StringToType(const Anope::string &nt)
+	{
+		if (nt.equals_ci("LOGON") || nt.equals_ci("0"))
+			return NEWS_LOGON;
+		if (nt.equals_ci("RANDOM") || nt.equals_ci("1"))
+			return NEWS_RANDOM;
+		if (nt.equals_ci("OPER") || nt.equals_ci("2"))
+			return NEWS_OPER;
+
+		return NEWS_LOGON; // Should never happen.
+	}
+}
 
 enum
 {
-	MSG_SYNTAX,
 	MSG_NEWS_SHORT,
 	MSG_NEWS_LONG,
 	MSG_LIST_HEADER,
@@ -29,45 +55,46 @@ enum
 	MSG_ADDED,
 	MSG_DEL_NOT_FOUND,
 	MSG_DELETED,
-	MSG_DEL_NONE,
-	MSG_DELETED_ALL
+	MSG_DELETED_ALL,
+	MSG_END,
+};
+
+struct NewsMessages final
+{
+	NewsType type;
+	Anope::string name;
+	const char *msgs[MSG_END];
 };
 
 struct NewsMessages msgarray[] = {
 	{NEWS_LOGON, "LOGON",
-	 {_("LOGONNEWS {ADD|DEL|LIST} [\037text\037|\037num\037]\002"),
-	  _("[\002Logon News\002] %s"),
+	 {_("[\002Logon News\002] %s"),
 	  _("[\002Logon News\002 - %s] %s"),
 	  _("Logon news items:"),
 	  _("There is no logon news."),
 	  _("Added new logon news item."),
 	  _("Logon news item #%s not found!"),
-	  _("Logon news item #%d deleted."),
-	  _("No logon news items to delete!"),
+	  _("Logon news item #%u deleted."),
 	  _("All logon news items deleted.")}
 	 },
 	{NEWS_OPER, "OPER",
-	 {_("OPERNEWS {ADD|DEL|LIST} [\037text\037|\037num\037]\002"),
-	  _("[\002Oper News\002] %s"),
+	 {_("[\002Oper News\002] %s"),
 	  _("[\002Oper News\002 - %s] %s"),
 	  _("Oper news items:"),
 	  _("There is no oper news."),
 	  _("Added new oper news item."),
 	  _("Oper news item #%s not found!"),
-	  _("Oper news item #%d deleted."),
-	  _("No oper news items to delete!"),
+	  _("Oper news item #%u deleted."),
 	  _("All oper news items deleted.")}
 	 },
 	{NEWS_RANDOM, "RANDOM",
-	 {_("RANDOMNEWS {ADD|DEL|LIST} [\037text\037|\037num\037]\002"),
-	  _("[\002Random News\002] %s"),
+	 {_("[\002Random News\002] %s"),
 	  _("[\002Random News\002 - %s] %s"),
 	  _("Random news items:"),
 	  _("There is no random news."),
 	  _("Added new random news item."),
 	  _("Random news item #%s not found!"),
-	  _("Random news item #%d deleted."),
-	  _("No random news items to delete!"),
+	  _("Random news item #%u deleted."),
 	  _("All random news items deleted.")}
 	 }
 };
@@ -83,7 +110,7 @@ struct NewsItemType final
 	void Serialize(Serializable *obj, Serialize::Data &data) const override
 	{
 		const auto *ni = static_cast<const NewsItem *>(obj);
-		data.Store("type", ni->type);
+		data.Store("type", TypeToString(ni->type));
 		data.Store("text", ni->text);
 		data.Store("who", ni->who);
 		data.Store("time", ni->time);
@@ -100,9 +127,9 @@ struct NewsItemType final
 		else
 			ni = new NewsItem();
 
-		unsigned int t;
+		Anope::string t;
 		data["type"] >> t;
-		ni->type = static_cast<NewsType>(t);
+		ni->type = StringToType(t);
 		data["text"] >> ni->text;
 		data["who"] >> ni->who;
 		data["time"] >> ni->time;

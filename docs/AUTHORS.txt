@@ -22,9 +22,9 @@ contributions they have made, are:
   * Michael Wobst <wobst.michael@web.de>
   * Mark Summers <mark@goopler.net>
   * Matt Schatz <genius3000@g3k.solutions>
+  * PeGaSuS <droider.pc@gmail.com>
   * Daniel Vassdal <shutter@canternet.org>
   * MatthewM <mcm@they-got.us>
-  * PeGaSuS <droider.pc@gmail.com>
   * Sebastian V. <hal9000@denorastats.org>
   * Alvaro Toledo <atoledo@keldon.org>
   * Dragone2 <dragone2@risposteinformatiche.it>
@@ -33,9 +33,9 @@ contributions they have made, are:
   * Hendrik Jäger <gitcommit@henk.geekmail.org>
   * k4be <k4be@pirc.pl>
   * Thomas Fargeix <t.fargeix@gmail.com>
+  * Val Lorentz <progval+git@progval.net>
   * Bram Matthys <syzop@vulnscan.org>
   * Federico G. Schwindt <fgsch@lodoss.net>
-  * Val Lorentz <progval+git@progval.net>
   * Alexander Barton <alex@barton.de>
   * CaPa CuL <capacul@gmail.com>
   * Cronus <cronus@nite-serv.com>

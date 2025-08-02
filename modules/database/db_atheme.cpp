@@ -134,9 +134,9 @@ struct UserData final
 	Anope::string info_adder;
 	Anope::string info_message;
 	time_t info_ts = 0;
-	Anope::string last_mask;
 	Anope::string last_quit;
-	Anope::string last_real_mask;
+	Anope::string last_userhost;
+	Anope::string last_userhost_real;
 	bool noexpire = false;
 	bool protect = false;
 	std::optional<time_t> protectafter;
@@ -432,7 +432,7 @@ private:
 		// crypt3-md5        Converted to enc_posix
 		// crypt3-sha2-256   Converted to enc_posix
 		// crypt3-sha2-512   Converted to enc_posix
-		// ircservices       Converted to enc_old
+		// ircservices       NO
 		// pbkdf2            NO
 		// pbkdf2v2          NO
 		// rawmd5            Converted to enc_md5
@@ -464,9 +464,6 @@ private:
 			Anope::B64Decode(pass.substr(8), rawpass);
 			Anope::Encrypt(rawpass, nc->pass);
 		}
-
-		else if (pass.compare(0, 13, "$ircservices$", 13) == 0)
-			nc->pass = "oldmd5:" + pass.substr(13);
 
 		else if (pass.compare(0, 8, "$rawmd5$", 8) == 0)
 			nc->pass = "md5:" + pass.substr(8);
@@ -512,7 +509,7 @@ private:
 
 		if (!forbid_service)
 		{
-			Log(this) << "Unable to convert forbidden email " << email << " as os_forbid is not loaded";
+			Log(this) << "Unable to convert forbidden email address " << email << " as os_forbid is not loaded";
 			return true;
 		}
 
@@ -625,6 +622,7 @@ private:
 			return true;
 		}
 
+		auto originalflags = flags;
 		Anope::string accessflags;
 		ApplyAccess(flags, 'A', accessflags, { "ACCESS_LIST" });
 		ApplyAccess(flags, 'a', accessflags, { "AUTOPROTECT", "PROTECT", "PROTECTME" });
@@ -647,7 +645,7 @@ private:
 			auto *access = accessprov->Create();
 			access->SetMask(mask, ci);
 			access->creator = setter;
-			access->description = "Imported from Atheme";
+			access->description = "Imported from Atheme: " + flags;
 			access->last_seen = modifiedtime;
 			access->created = modifiedtime;
 			access->AccessUnserialize(accessflags);
@@ -1145,9 +1143,9 @@ private:
 		else if (key == "private:freeze:timestamp")
 			data->suspend_ts = Anope::Convert<time_t>(value, 0);
 		else if (key == "private:host:actual")
-			data->last_real_mask = value;
+			data->last_userhost_real = value;
 		else if (key == "private:host:vhost")
-			data->last_mask = value;
+			data->last_userhost = value;
 		else if (key == "private:lastquit:message")
 			data->last_quit = value;
 		else if (key == "private:loginfail:failnum")
@@ -1313,14 +1311,14 @@ private:
 		auto *data = userdata.Get(nc);
 		if (data)
 		{
-			if (!data->last_mask.empty())
-				na->last_usermask = data->last_mask;
+			if (!data->last_userhost.empty())
+				na->last_userhost = data->last_userhost;
 
 			if (!data->last_quit.empty())
 				na->last_quit = data->last_quit;
 
-			if (!data->last_real_mask.empty())
-				na->last_realhost = data->last_real_mask;
+			if (!data->last_userhost_real.empty())
+				na->last_userhost_real = data->last_userhost_real;
 
 			if (data->noexpire)
 				na->Extend<bool>("NS_NO_EXPIRE");

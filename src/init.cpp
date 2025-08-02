@@ -382,6 +382,9 @@ bool Anope::Init(int ac, char **av)
 	if (GetCommandLineArgument("noexpire", 'e'))
 		Anope::NoExpire = true;
 
+	if (GetCommandLineArgument("nodb", 'b'))
+		Anope::NoDB = true;
+
 	if (GetCommandLineArgument("protocoldebug"))
 		Anope::ProtocolDebug = true;
 
@@ -390,11 +393,10 @@ bool Anope::Init(int ac, char **av)
 	{
 		if (!arg.empty())
 		{
-			auto level = Anope::Convert<int>(arg, -1);
-			if (level > 0)
-				Anope::Debug = level;
-			else
+			auto level = Anope::TryConvert<unsigned>(arg);
+			if (!level.has_value())
 				throw CoreException("Invalid option given to --debug");
+			Anope::Debug = level.value();
 		}
 		else
 			++Anope::Debug;
@@ -553,9 +555,14 @@ bool Anope::Init(int ac, char **av)
 		setuidgid();
 #endif
 
-	auto *encryption = ModuleManager::FindFirstOf(ENCRYPTION);
-	if (!encryption)
-		throw CoreException("You must load a non-deprecated encryption module!");
+	if (!Anope::NoDB)
+	{
+		if (!ModuleManager::FindFirstOf(DATABASE))
+			throw CoreException("You must load a non-deprecated database module!");
+
+		if (!ModuleManager::FindFirstOf(ENCRYPTION))
+			throw CoreException("You must load a non-deprecated encryption module!");
+	}
 
 	if (!IRCD)
 		throw CoreException("You must load a protocol module!");

@@ -1,18 +1,53 @@
-Anope Version 2.1.15-git
-------------------------
+Anope Version 2.1.18-git
+--------------------
+No significant changes.
+
+Anope Version 2.1.17
+--------------------
+Allowed opers to resend passwords for users in nickserv/resend.
+Fixed HostServ using a different valid username character set to the protocol module.
+Fixed losing the channel and nickname registration time when upgrading from an earlier 2.1 release.
+Improved the messages sent when a user is forced off a protected nickname.
+Simplified copying modules to the runtime directory on Windows.
+
+Anope Version 2.1.16
+--------------------
+Added support for on-IRC code confirmation.
+Added the ability for fantasy commands to be executable without the FANTASY privilege.
+Added the ability to prepend to topics as well as appending to them.
+Changed various fields to serialize to the database as a string not an integer.
+Disabled db_flatfile by default in preparation for becoming import-only.
+Fixed a memory leak in the db_json module.
+Fixed building on OpenSSL 1.1.1 (for now).
+Fixed removed and later re-added temporary bans being removed automatically.
+Fixed sometimes sending malformed LMODE messages on InspIRCd.
+Fixed the "did you mean" message suggesting unloaded commands.
+Fixed various issues with the example config files.
+Marked db_json as the recommended database module.
+Moved the BAN, UNBAN, and KICK commands to the chanserv/management group.
+Removed support for the 1.8-style seen command.
+Reworked confirmation to allow confirmation of multiple account actions.
+When dropping a display nickname the new display will now be the oldest in the group.
+
+Anope Version 2.1.15
+--------------------
 Added a workaround to the jsonrpc module for JavaScript truncating big integers.
 Added an example Ruby library for accessing the RPC interface.
 Added away state and tls usage to the anope.user RPC event.
 Added support for looking up accounts by identifier in the anope.account RPC event.
 Added support for storing the setter and set time and setter of list modes and restoring them on InspIRCd and Solanum.
 Added support for token authentication to the RPC modules.
+Added the anope.checkCredentials, anope.identify, anope.listCommands, and anope.command RPC events to the new rpc_user module.
 Bumped the minimum supported version of ircd-hybrid to 8.2.34.
 Deprecated irc2sql in favour of rpc_data.
 Dropped support for Bahamut as it has no known users.
 Fixed creating duplicate Stats rows on some servers.
 Fixed loading databases in db_json.
+Fixed restoring cloaked hosts on InspIRCd when the cloak module is not loaded.
+Fixed some variable shadowing that potentially caused issues with the SQL database backends.
 Fixed sometimes writing accounts to the database without a unique identifier.
 Fixed various documentation issues with the example JavaScript JSON-RPC client.
+Improved CTCP handling and added support for more CTCP types.
 
 Anope Version 2.1.14
 --------------------

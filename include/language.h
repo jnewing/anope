@@ -102,7 +102,7 @@ namespace Language
 /* Commonly used language strings */
 #define CONFIRM_DROP			_("Please confirm that you want to drop \002%s\002 with \002%s\032%s\032%s\002")
 #define SERVICE_UNAVAILABLE		_("Sorry, %s is temporarily unavailable.")
-#define MORE_INFO			_("\002%s\002 for more information.")
+#define MORE_INFO			_("Type \002%s\002 for more information.")
 #define BAD_USERHOST_MASK		_("Mask must be in the form \037user\037@\037host\037.")
 #define BAD_EXPIRY_TIME			_("Invalid expiry time.")
 #define USERHOST_MASK_TOO_WIDE		_("%s coverage is too wide; Please use a more specific mask.")
@@ -114,7 +114,6 @@ namespace Language
 						"cannot contain the space or tab characters.")
 #define PASSWORD_TOO_SHORT		_("Your password is too short. It must be longer than %u characters.")
 #define PASSWORD_TOO_LONG		_("Your password is too long. It must be shorter than %u characters.")
-#define NICK_NOT_REGISTERED		_("Your nick isn't registered.")
 #define NICK_X_NOT_REGISTERED		_("Nick \002%s\002 isn't registered.")
 #define NICK_X_NOT_IN_USE		_("Nick \002%s\002 isn't currently in use.")
 #define NICK_X_NOT_ON_CHAN		_("\002%s\002 is not currently on channel %s.")
@@ -127,14 +126,9 @@ namespace Language
 #define UNKNOWN				_("<unknown>")
 #define NO_EXPIRE			_("does not expire")
 #define LIST_INCORRECT_RANGE		_("Incorrect range specified. The correct syntax is \002#\037from\037-\037to\037\002.")
-#define NICK_IS_SECURE			_("This nickname is registered and protected.  If it is your " \
-						"nick, type \002%s\032\037password\037\002.  Otherwise, " \
-						"please choose a different nick.")
-#define FORCENICKCHANGE_NOW		_("This nickname has been registered; you may not use it.")
 #define NICK_CANNOT_BE_REGISTERED	_("Nickname \002%s\002 may not be registered.")
 #define NICK_ALREADY_REGISTERED		_("Nickname \002%s\002 is already registered!")
 #define NICK_SET_DISPLAY_CHANGED	_("The new display is now \002%s\002.")
-#define NICK_CONFIRM_INVALID		_("Invalid passcode has been entered, please check the email again, and retry.")
 #define CHAN_NOT_ALLOWED_TO_JOIN	_("You are not permitted to be on this channel.")
 #define CHAN_X_INVALID			_("Channel %s is not a valid channel.")
 #define CHAN_REACHED_CHANNEL_LIMIT	_("Sorry, you have already reached your limit of \002%d\002 channels.")

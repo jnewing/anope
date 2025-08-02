@@ -181,7 +181,7 @@ Serializable *NickCore::Type::Unserialize(Serializable *obj, Serialize::Data &da
 	// End 2.0 compatibility.
 
 	// Begin 2.1 compatibility.
-	if (!nc->registered)
+	if (nc->registered == Anope::CurTime)
 		data["time_registered"] >> nc->registered;
 	// End 2.1 compatibility.
 
@@ -190,14 +190,20 @@ Serializable *NickCore::Type::Unserialize(Serializable *obj, Serialize::Data &da
 
 void NickCore::SetDisplay(NickAlias *na)
 {
-	if (na->nc != this || na->nick == this->display)
+	// If no nick is specified then pick the oldest one.
+	if (!na)
+	{
+		for (auto *alias : *this->aliases)
+		{
+			if (!na || alias->registered < na->registered)
+				na = alias;
+		}
+	}
+
+	if (!na || na->nc != this || na->nick == this->display)
 		return;
 
 	FOREACH_MOD(OnChangeCoreDisplay, (this, na->nick));
-
-	/* this affects the serialized aliases */
-	for (auto *alias : *aliases)
-		alias->QueueUpdate();
 
 	/* Remove the core from the list */
 	NickCoreList->erase(this->display);

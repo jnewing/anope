@@ -379,11 +379,11 @@ namespace Anope
 
 	/** The debug level we are running at.
 	 */
-	extern CoreExport int Debug;
+	extern CoreExport unsigned Debug;
 
 	/** Other command line options.
 	 */
-	extern CoreExport bool ReadOnly, NoFork, NoThird, NoPID, NoExpire, ProtocolDebug;
+	extern CoreExport bool ReadOnly, NoFork, NoThird, NoDB, NoPID, NoExpire, ProtocolDebug;
 
 	/** The root of the Anope installation. Usually ~/anope
 	 */

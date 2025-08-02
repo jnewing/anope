@@ -154,7 +154,7 @@ public:
 	{
 		std::deque<ChannelInfo *> chans;
 		nc->GetChannelReferences(chans);
-		int max_reg = Config->GetModule(this).Get<int>("maxregistered");
+		auto max_reg = Config->GetModule(this).Get<uint16_t>("maxregistered");
 
 		for (auto *ci : chans)
 		{
@@ -330,7 +330,7 @@ public:
 			ci->Extend<bool>(def.upper());
 	}
 
-	EventReturn OnCanSet(User *u, const ChannelMode *cm) override
+	EventReturn OnCanSet(User *u, Channel *c, const ChannelMode *cm) override
 	{
 		if (Config->GetModule(this).Get<const Anope::string>("nomlock").find(cm->mchar) != Anope::string::npos
 			|| Config->GetModule(this).Get<const Anope::string>("require").find(cm->mchar) != Anope::string::npos)

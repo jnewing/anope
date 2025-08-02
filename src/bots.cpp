@@ -34,6 +34,36 @@ BotInfo::BotInfo(const Anope::string &nnick, const Anope::string &nuser, const A
 	if (!this->uid.empty())
 		(*BotListByUID)[this->uid] = this;
 
+	ctcps.emplace("CLIENTINFO", [this](auto *bi, auto *u, const auto &)
+	{
+		Anope::string buf;
+		for (const auto &[ctcp, _] : this->ctcps)
+		{
+			if (!buf.empty())
+				buf.push_back(' ');
+			buf.append(ctcp.upper());
+		}
+		IRCD->SendNotice(bi, u->GetUID(), Anope::FormatCTCP("CLIENTINFO", buf));
+	});
+	ctcps.emplace("PING", [](auto *bi, auto *u, const auto &ctcpbody)
+	{
+		IRCD->SendNotice(bi, u->GetUID(), Anope::FormatCTCP("PING", ctcpbody));
+	});
+	ctcps.emplace("SOURCE", [](auto *bi, auto *u, const auto &)
+	{
+		IRCD->SendNotice(bi, u->GetUID(), Anope::FormatCTCP("SOURCE", "https://www.anope.org/"));
+	});
+	ctcps.emplace("TIME", [](auto *bi, auto *u, const auto &)
+	{
+		IRCD->SendNotice(bi, u->GetUID(), Anope::FormatCTCP("TIME", Anope::strftime(Anope::CurTime, nullptr, true)));
+	});
+	ctcps.emplace("VERSION", [](auto *bi, auto *u, const auto &)
+	{
+		auto *enc = ModuleManager::FindFirstOf(ENCRYPTION);
+		IRCD->SendNotice(bi, u->GetUID(), Anope::FormatCTCP("VERSION", Anope::printf("Anope-%s %s -- %s -- %s", Anope::Version().c_str(),
+			Anope::VersionBuildString().c_str(), IRCD->GetProtocolName().c_str(), enc ? enc->name.c_str() : "(none)")));
+	});
+
 	FOREACH_MOD(OnCreateBot, (this));
 
 	// If we're synchronised with the uplink already, send the bot.
@@ -281,7 +311,7 @@ Anope::string BotInfo::GetQueryCommand(const Anope::string &command, const Anope
 
 	if (!command.empty())
 	{
-		Anope::string actual_command = "\036(MISSING)\036";
+		Anope::string actual_command;
 		for (const auto &[c_name, info] : this->commands)
 		{
 			if (info.name != command)
@@ -292,8 +322,9 @@ Anope::string BotInfo::GetQueryCommand(const Anope::string &command, const Anope
 				break; // Keep going to find a non-hidden alternative.
 		}
 
-		if (!actual_command.empty())
-			buf.append(" ").append(actual_command);
+		if (actual_command.empty())
+			return "\036(MISSING)\036";
+		buf.append(" ").append(actual_command);
 	}
 
 	if (!extra.empty())

@@ -32,10 +32,12 @@ struct CommandInfo final
 	Anope::string permission;
 	/* Group this command is in */
 	Anope::string group;
-	/* whether or not to hide this command in help output */
+	/* Whether to hide this command in help and suggestions */
 	bool hide = false;
-	/* Only used with fantasy */
+	/* Whether to prepend the channel name (only used with fantasy) */
 	bool prepend_channel = false;
+	/* Whether to require the FANTASY privilege (only used with fantasy) */
+	bool require_privilege = true;
 };
 
 /* Where the replies from commands go to. User inherits from this and is the normal

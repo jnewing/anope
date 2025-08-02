@@ -11,118 +11,23 @@
 
 #include "module.h"
 
+namespace
+{
+	Anope::string *GetCode(NickCore *nc)
+	{
+		auto *code = nc->GetExt<Anope::string>("passcode");
+		if (!code)
+		{
+			code = nc->Extend<Anope::string>("passcode");
+			*code = Anope::Random(Config->GetBlock("options").Get<size_t>("codelength", "15"));
+		}
+		return code;
+	}
+}
+
 static bool SendRegmail(User *u, const NickAlias *na, BotInfo *bi);
 
 static ServiceReference<NickServService> nickserv("NickServService", "NickServ");
-
-class CommandNSConfirm final
-	: public Command
-{
-public:
-	CommandNSConfirm(Module *creator) : Command(creator, "nickserv/confirm", 1, 2)
-	{
-		this->SetDesc(_("Confirm a passcode"));
-		this->SetSyntax(_("\037passcode\037"));
-		this->AllowUnregistered(true);
-	}
-
-	void Execute(CommandSource &source, const std::vector<Anope::string> &params) override
-	{
-		Anope::string *code = source.nc ? source.nc->GetExt<Anope::string>("passcode") : NULL;
-		bool confirming_other = !code || *code != params[0];
-
-		if (source.nc && (!source.nc->HasExt("UNCONFIRMED") || (source.IsOper() && confirming_other)) && source.HasPriv("nickserv/confirm"))
-		{
-			const Anope::string &nick = params[0];
-			NickAlias *na = NickAlias::Find(nick);
-			if (na == NULL)
-				source.Reply(NICK_X_NOT_REGISTERED, nick.c_str());
-			else if (!na->nc->HasExt("UNCONFIRMED"))
-				source.Reply(_("Nick \002%s\002 is already confirmed."), na->nick.c_str());
-			else
-			{
-				na->nc->Shrink<bool>("UNCONFIRMED");
-				FOREACH_MOD(OnNickConfirm, (source.GetUser(), na->nc));
-				Log(LOG_ADMIN, source, this) << "to confirm nick " << na->nick << " (" << na->nc->display << ")";
-				source.Reply(_("Nick \002%s\002 has been confirmed."), na->nick.c_str());
-
-				/* Login the users online already */
-				for (std::list<User *>::iterator it = na->nc->users.begin(); it != na->nc->users.end(); ++it)
-				{
-					User *u = *it;
-
-					IRCD->SendLogin(u, na);
-
-					NickAlias *u_na = NickAlias::Find(u->nick);
-
-					/* Set +r if they're on a nick in the group */
-					if (!Config->GetModule("nickserv").Get<bool>("nonicknameownership") && u_na && *u_na->nc == *na->nc)
-						u->SetMode(source.service, "REGISTERED");
-				}
-			}
-		}
-		else if (source.nc)
-		{
-			const Anope::string &passcode = params[0];
-			if (code != NULL && *code == passcode)
-			{
-				NickCore *nc = source.nc;
-				nc->Shrink<Anope::string>("passcode");
-				Log(LOG_COMMAND, source, this) << "to confirm their email";
-				source.Reply(_("Your email address of \002%s\002 has been confirmed."), source.nc->email.c_str());
-				nc->Shrink<bool>("UNCONFIRMED");
-				FOREACH_MOD(OnNickConfirm, (source.GetUser(), nc));
-
-				if (source.GetUser())
-				{
-					NickAlias *na = NickAlias::Find(source.GetNick());
-					if (na)
-					{
-						IRCD->SendLogin(source.GetUser(), na);
-						if (!Config->GetModule("nickserv").Get<bool>("nonicknameownership") && na->nc == source.GetAccount() && !na->nc->HasExt("UNCONFIRMED"))
-							source.GetUser()->SetMode(source.service, "REGISTERED");
-					}
-				}
-			}
-			else
-				source.Reply(_("Invalid passcode."));
-		}
-		else
-			source.Reply(NICK_IDENTIFY_REQUIRED);
-
-		return;
-	}
-
-	bool OnHelp(CommandSource &source, const Anope::string &subcommand) override
-	{
-		this->SendSyntax(source);
-		source.Reply(" ");
-		source.Reply(_(
-			"This command is used by several commands as a way to confirm "
-			"changes made to your account."
-			"\n\n"
-			"This is most commonly used to confirm your email address once "
-			"you register or change it."
-			"\n\n"
-			"This is also used after the RESETPASS command has been used to "
-			"force identify you to your nick so you may change your password."
-		));
-
-		if (source.HasPriv("nickserv/confirm"))
-		{
-			source.Reply(_(
-				"Additionally, Services Operators with the \037nickserv/confirm\037 permission can "
-				"replace \037passcode\037 with a users nick to force validate them."
-			));
-		}
-		return true;
-	}
-
-	void OnSyntaxError(CommandSource &source, const Anope::string &subcommand) override
-	{
-		source.Reply(NICK_CONFIRM_INVALID);
-	}
-};
 
 class CommandNSRegister final
 	: public Command
@@ -236,7 +141,7 @@ public:
 
 			if (u)
 			{
-				na->last_usermask = u->GetIdent() + "@" + u->GetDisplayedHost();
+				na->last_userhost = u->GetIdent() + "@" + u->GetDisplayedHost();
 				na->last_realname = u->realname;
 			}
 			else
@@ -245,7 +150,7 @@ public:
 			Log(LOG_COMMAND, source, this) << "to register " << na->nick << " (email: " << (!na->nc->email.empty() ? na->nc->email : "none") << ")";
 
 			source.Reply(_("Nickname \002%s\002 registered."), u_nick.c_str());
-			if (nsregister.equals_ci("admin"))
+			if (nsregister.equals_ci("admin") || nsregister.equals_ci("code"))
 			{
 				nc->Extend<bool>("UNCONFIRMED");
 			}
@@ -270,8 +175,14 @@ public:
 			{
 				if (nsregister.equals_ci("admin"))
 					source.Reply(_("All new accounts must be validated by an administrator. Please wait for your registration to be confirmed."));
+				else if (nsregister.equals_ci("code"))
+				{
+					const auto *code = GetCode(na->nc);
+					source.Reply(_("Your account is not confirmed. To confirm it, type \002%s\002."),
+						source.service->GetQueryCommand("nickserv/confirm/register", *code).c_str());
+				}
 				else if (nsregister.equals_ci("mail"))
-					source.Reply(_("Your email address is not confirmed. To confirm it, follow the instructions that were emailed to you."));
+					source.Reply(_("Your account is not confirmed. To confirm it, follow the instructions that were emailed to you."));
 			}
 		}
 	}
@@ -308,19 +219,130 @@ public:
 		{
 			source.Reply(" ");
 			source.Reply(_(
-				"The \037email\037 parameter is optional and will set the email "
-				"for your nick immediately. You may also wish to \002SET\032HIDE\002 it "
-				"after registering if it isn't the default setting already."
+				"The \037email\037 parameter is optional and will set the email address for your "
+				"nick immediately. You may also wish to \002SET\032HIDE\002 it after registering "
+				"if it isn't the default setting already."
 			));
 		}
 
+		if (!Config->GetModule("nickserv").Get<bool>("nonicknameownership"))
+		{
+			source.Reply(" ");
+			source.Reply(_(
+				"You can associate multiple nicknames with your account. All nicknames will "
+				"share the same configuration, set of memos, and channel privileges."
+			));
+		}
+
+		return true;
+	}
+};
+
+class CommandNSConfirmRegister final
+	: public Command
+{
+public:
+	CommandNSConfirmRegister(Module *creator)
+		: Command(creator, "nickserv/confirm/register", 1, 2)
+	{
+		this->SetDesc(_("Confirm a previous account registration"));
+		this->SetSyntax(_("\037code\037"));
+		this->SetSyntax(_("@\037nickname\037"), [](auto &source) { return source.HasPriv("nickserv/confirm/register"); });
+	}
+
+	void Execute(CommandSource &source, const std::vector<Anope::string> &params) override
+	{
+		auto has_priv = source.HasPriv("nickserv/confirm/register");
+
+		Anope::string code;
+		NickAlias *na;
+		if (params[0] == '@')
+		{
+			if (!has_priv)
+			{
+				source.Reply(ACCESS_DENIED);
+				return;
+			}
+
+			auto nick = params[0].substr(0);
+			na = NickAlias::Find(nick);
+			if (!na)
+			{
+				source.Reply(NICK_X_NOT_REGISTERED, nick.c_str());
+				return;
+			}
+		}
+		else
+		{
+			code = params[0];
+			na = source.GetAccount()->na;
+		}
+
+		NickCore *nc = na->nc;
+		if (nc->HasExt("NS_SUSPENDED"))
+		{
+			source.Reply(NICK_X_SUSPENDED, na->nick.c_str());
+			return;
+		}
+
+		auto *passcode = nc->GetExt<Anope::string>("passcode");
+		if (!passcode)
+		{
+			source.Reply(_("There is no registration confirmation pending for %s."),
+				na->nick.c_str());
+			return;
+		}
+		if (has_priv || !code.equals_cs(*passcode))
+		{
+			source.Reply(_("The registration confirmation code you specified for %s is incorrect."),
+				na->nick.c_str());
+			return;
+		}
+
+		na->nc->Shrink<bool>("UNCONFIRMED");
+		FOREACH_MOD(OnNickConfirm, (source.GetUser(), nc));
+
+		auto nonicknameownership = Config->GetModule("nickserv").Get<bool>("nonicknameownership");
+		for (auto *u : nc->users)
+		{
+			IRCD->SendLogin(u, na);
+
+			if (!nonicknameownership)
+				continue;
+
+			const auto &aliases = *nc->aliases;
+			auto it = std::find_if(aliases.begin(), aliases.end(), [&u](const auto *na) {
+				return na->nick.equals_ci(u->nick);
+			});
+			if (it != aliases.end())
+				u->SetMode(source.service, "REGISTERED"); // nick is in the group
+		}
+
+		Log(nc == source.GetAccount() ? LOG_COMMAND : LOG_ADMIN, source, this) << "to confirm the registration of " << nc->display;
+		source.Reply(_("Nick \002%s\002 has been confirmed."), na->nick.c_str());
+	}
+
+	bool OnHelp(CommandSource &source, const Anope::string &) override
+	{
+		auto unconfirmedexpire = Config->GetModule(owner).Get<time_t>("unconfirmedexpire", "1d");
+
+		this->SendSyntax(source);
 		source.Reply(" ");
 		source.Reply(_(
-			"This command also creates a new group for your nickname, "
-			"that will allow you to register other nicks later sharing "
-			"the same configuration, the same set of memos and the "
-			"same channel privileges."
-		));
+				"Confirms an account registration. You have %s after registration to do this "
+				"before your registration expires."
+			),
+			Anope::Duration(unconfirmedexpire, source.GetAccount()).c_str());
+
+		if (source.HasPriv("nickserv/confirm/register"))
+		{
+			source.Reply(" ");
+			source.Reply(_(
+				"Additionally, Services Operators with the \037nickserv/confirm/register\037 "
+				"permission can specify @\037nickname\037 instead of \037code\037 to force "
+				"confirm another user's account registration."
+			));
+		}
 		return true;
 	}
 };
@@ -329,9 +351,12 @@ class CommandNSResend final
 	: public Command
 {
 public:
-	CommandNSResend(Module *creator) : Command(creator, "nickserv/resend", 0, 0)
+	CommandNSResend(Module *creator)
+		: Command(creator, "nickserv/resend", 0, 1)
 	{
 		this->SetDesc(_("Resend registration confirmation email"));
+		this->SetSyntax(_("[\037nickname\037]"), [](auto &source) { return source.HasCommand("nickserv/resend"); });
+		this->AllowUnregistered(true);
 	}
 
 	void Execute(CommandSource &source, const std::vector<Anope::string> &params) override
@@ -342,27 +367,49 @@ public:
 			return;
 		}
 
-		const NickAlias *na = NickAlias::Find(source.GetNick());
-
-		if (na == NULL)
-			source.Reply(NICK_NOT_REGISTERED);
-		else if (na->nc != source.GetAccount() || !source.nc->HasExt("UNCONFIRMED"))
-			source.Reply(_("Your account is already confirmed."));
-		else
+		auto is_oper = false;
+		Anope::string nick;
+		if (!params.empty() && source.HasCommand("nickserv/resend"))
 		{
-			if (Anope::CurTime < source.nc->lastmail + Config->GetModule(this->owner).Get<time_t>("resenddelay"))
-				source.Reply(_("Cannot send mail now; please retry a little later."));
-			else if (SendRegmail(source.GetUser(), na, source.service))
-			{
-				na->nc->lastmail = Anope::CurTime;
-				source.Reply(_("Your passcode has been re-sent to %s."), na->nc->email.c_str());
-				Log(LOG_COMMAND, source, this) << "to resend registration verification code";
-			}
-			else
-				Log(this->owner) << "Unable to resend registration verification code for " << source.GetNick();
+			nick = params[0];
+			is_oper = true;
+		}
+		else if (source.nc)
+			nick = source.GetAccount()->display;
+		else
+			nick = source.GetNick();
+
+		const auto *na = NickAlias::Find(nick);
+		if (!na)
+		{
+			source.Reply(NICK_X_NOT_REGISTERED, nick.c_str());
+			return;
 		}
 
-		return;
+		NickCore *nc = na->nc;
+		if (!nc->HasExt("UNCONFIRMED"))
+		{
+			source.Reply(_("Nick \002%s\002 is already confirmed."), na->nick.c_str());
+			return;
+		}
+
+		if (!is_oper && Anope::CurTime < nc->lastmail + Config->GetModule(this->owner).Get<time_t>("resenddelay"))
+		{
+			source.Reply(_("Cannot send mail now; please retry a little later."));
+			return;
+		}
+
+		if (!SendRegmail(source.GetUser(), na, source.service))
+		{
+			Log(this->owner) << "Unable to resend registration confirmation code for " << na->nick;
+			return;
+		}
+
+		nc->lastmail = Anope::CurTime;
+		source.Reply(_("The confirmation code for \002%s\002 has been re-sent to %s."),
+			na->nick.c_str(), nc->email.c_str());
+
+		Log(nc == source.GetAccount() ? LOG_COMMAND : LOG_ADMIN, source, this) << "to resend the registration confirmation code for " << na->nick;
 	}
 
 	bool OnHelp(CommandSource &source, const Anope::string &subcommand) override
@@ -372,7 +419,16 @@ public:
 
 		this->SendSyntax(source);
 		source.Reply(" ");
-		source.Reply(_("This command will resend you the registration confirmation email."));
+		source.Reply(_("This command will resend a registration confirmation email."));
+
+		if (source.HasCommand("nickserv/resend"))
+		{
+			source.Reply(" ");
+			source.Reply(_(
+				"Additionally, Services Operators with the \037nickserv/resend\037 permission "
+				"can specify a nickname to resend a confirmation email for another account."
+			));
+		}
 		return true;
 	}
 
@@ -387,16 +443,20 @@ class NSRegister final
 	: public Module
 {
 	CommandNSRegister commandnsregister;
-	CommandNSConfirm commandnsconfirm;
-	CommandNSResend commandnsrsend;
+	CommandNSConfirmRegister commandnsconfirmregister;
+	CommandNSResend commandnsresend;
 
 	SerializableExtensibleItem<bool> unconfirmed;
 	SerializableExtensibleItem<Anope::string> passcode;
 
 public:
-	NSRegister(const Anope::string &modname, const Anope::string &creator) : Module(modname, creator, VENDOR),
-		commandnsregister(this), commandnsconfirm(this), commandnsrsend(this), unconfirmed(this, "UNCONFIRMED"),
-		passcode(this, "passcode")
+	NSRegister(const Anope::string &modname, const Anope::string &creator)
+		: Module(modname, creator, VENDOR)
+		, commandnsregister(this)
+		, commandnsconfirmregister(this)
+		, commandnsresend(this)
+		, unconfirmed(this, "UNCONFIRMED")
+		, passcode(this, "passcode")
 	{
 		if (Config->GetModule(this).Get<const Anope::string>("registration").equals_ci("disable"))
 			throw ModuleException("Module " + this->name + " will not load with registration disabled.");
@@ -410,8 +470,15 @@ public:
 			const Anope::string &nsregister = Config->GetModule(this).Get<const Anope::string>("registration");
 			if (nsregister.equals_ci("admin"))
 				u->SendMessage(NickServ, _("All new accounts must be validated by an administrator. Please wait for your registration to be confirmed."));
-			else
-				u->SendMessage(NickServ, _("Your email address is not confirmed. To confirm it, follow the instructions that were emailed to you."));
+			else if (nsregister.equals_ci("code"))
+			{
+				const auto *code = GetCode(u->Account());
+				u->SendMessage(NickServ, _("Your account is not confirmed. To confirm it, type \002%s\002."),
+					NickServ->GetQueryCommand("nickserv/confirm/register", *code).c_str());
+			}
+			else if (nsregister.equals_ci("mail"))
+				u->SendMessage(NickServ, _("Your account is not confirmed. To confirm it, follow the instructions that were emailed to you."));
+
 			const NickAlias *this_na = u->AccountNick();
 			time_t registered = Anope::CurTime - this_na->registered;
 			time_t unconfirmed_expire = Config->GetModule(this).Get<time_t>("unconfirmedexpire", "1d");
@@ -434,13 +501,7 @@ public:
 static bool SendRegmail(User *u, const NickAlias *na, BotInfo *bi)
 {
 	NickCore *nc = na->nc;
-
-	Anope::string *code = na->nc->GetExt<Anope::string>("passcode");
-	if (code == NULL)
-	{
-		code = na->nc->Extend<Anope::string>("passcode");
-		*code = Anope::Random(Config->GetBlock("options").Get<size_t>("codelength", "15"));
-	}
+	auto *code = GetCode(na->nc);
 
 	Anope::map<Anope::string> vars = {
 		{ "nick",    na->nick                                                                },
